@@ -314,7 +314,7 @@ function limparCacheAntigo() {
   const keysParaRemover = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('liturgia_') && key !== chaveHojeStr) {
+    if (key && key && (key.startsWith('liturgia_') || key.startsWith('liturgia2_')) && key !== chaveHojeStr) {
       keysParaRemover.push(key);
     }
   }
@@ -533,7 +533,7 @@ function renderLiturgia() {
           <div class="leitura-label">Salmo Responsorial</div>
           <div class="leitura-ref">${completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia)}</div>
           <div class="salmo-resp">R. ${lit.salmo.refrao || lit.salmo.resposta || ''}</div>
-          <div class="leitura-texto">${(lit.salmo.texto || '').replace(/\n/g,'<br>')}</div>
+          <div class="leitura-texto" style="white-space:pre-wrap">${(lit.salmo.texto || '').replace(/\\n/g,'\n')}</div>
         </div>
 
         ${temSegunda ? `<div class="leitura-section">
