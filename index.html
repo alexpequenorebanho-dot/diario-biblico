@@ -531,7 +531,7 @@ function renderLiturgia() {
 
         <div class="leitura-section">
           <div class="leitura-label">Salmo Responsorial</div>
-          <div class="leitura-ref">${completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia)}</div>
+          <div class="leitura-ref" id="salmo-ref-display">${completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia)}</div>
           <div class="salmo-resp">R. ${lit.salmo.refrao || lit.salmo.resposta || ''}</div>
           <div class="leitura-texto" style="white-space:pre-wrap">${(lit.salmo.texto || '').replace(/\\n/g,'\n')}</div>
         </div>
@@ -555,6 +555,17 @@ function renderLiturgia() {
         </button>
       </div>
     </div>`;
+
+  // Se a referência do salmo está incompleta, busca via IA em background
+  if (lit.salmo && lit.primeiraLeitura && !completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia).includes(',')) {
+    buscarRefSalmoIA(lit.salmo.referencia, lit.primeiraLeitura.referencia, lit.data || hoje())
+      .then(refCompleta => {
+        const el = document.getElementById('salmo-ref-display');
+        if (el && refCompleta && refCompleta !== lit.salmo.referencia) {
+          el.textContent = refCompleta;
+        }
+      });
+  }
 }
 
 // ─── RENDER LECTIO ────────────────────────────────────────────────────────────
@@ -877,6 +888,43 @@ const SALMOS_REF = {
   'At 22, 30; 23, 6-11': 'Sl 15(16),1-2a e 5.7-8.9-10.11 (R. 1)',
   'At 25, 13b-21': 'Sl 102(103),1-2.11-12.19-20ab (R. 19a)',
   'At 28, 16-20.30-31': 'Sl 10(11),4.5 e 7 (R. cf. Jo 17,22b)',
+  // ── TEMPO COMUM — Semanas 8-9 (maio/junho) — 1Pedro e 1João ───────────────
+  '1Pd 1,10-16':   'Sl 97(98),1.2-3ab.3cd-4 (R. 2b)',
+  '1Pd 1, 10-16':  'Sl 97(98),1.2-3ab.3cd-4 (R. 2b)',
+  '1Pd 1,18-25':   'Sl 147,12-13.14-15.19-20 (R. 12a)',
+  '1Pd 1, 18-25':  'Sl 147,12-13.14-15.19-20 (R. 12a)',
+  '1Pd 2,2-5.9-12': 'Sl 99(100),2.3.4.5 (R. cf. 2a)',
+  '1Pd 2, 2-5.9-12': 'Sl 99(100),2.3.4.5 (R. cf. 2a)',
+  '1Pd 4,7b-13':   'Sl 95(96),10.11-12.13 (R. Jo 14,28)',
+  '1Pd 4, 7b-13':  'Sl 95(96),10.11-12.13 (R. Jo 14,28)',
+  '1Pd 5,1-4':     'Sl 22(23),1-3a.3b-4.5.6 (R. 1)',
+  '1Pd 5, 1-4':    'Sl 22(23),1-3a.3b-4.5.6 (R. 1)',
+  '1Jo 1,5-2,2':   'Sl 102(103),1-2.3-4.8-9.13-14 (R. 8a)',
+  '1Jo 1, 5-2, 2': 'Sl 102(103),1-2.3-4.8-9.13-14 (R. 8a)',
+  '1Jo 2,3-11':    'Sl 95(96),1-2a.2b-3.4-5 (R. cf. 3)',
+  '1Jo 2, 3-11':   'Sl 95(96),1-2a.2b-3.4-5 (R. cf. 3)',
+  '1Jo 2,12-17':   'Sl 148,12-13.14.15.20bc (R. cf. 12)',
+  '1Jo 2, 12-17':  'Sl 148,12-13.14.15.20bc (R. cf. 12)',
+  '1Jo 2,18-25':   'Sl 27(28),1.4.7-8.9 (R. cf. 8)',
+  '1Jo 2, 18-25':  'Sl 27(28),1.4.7-8.9 (R. cf. 8)',
+  '1Jo 3,1-10':    'Sl 31(32),1-2.5.11 (R. cf. 1)',
+  '1Jo 3, 1-10':   'Sl 31(32),1-2.5.11 (R. cf. 1)',
+  '1Jo 3,11-21':   'Sl 100(101),1-2ab.2cd-3.4-5 (R. 2ab)',
+  '1Jo 3, 11-21':  'Sl 100(101),1-2ab.2cd-3.4-5 (R. 2ab)',
+  '1Jo 4,1-6':     'Sl 95(96),1-2a.2b-3.10 (R. cf. 3)',
+  '1Jo 4, 1-6':    'Sl 95(96),1-2a.2b-3.10 (R. cf. 3)',
+  '1Jo 4,7-10':    'Sl 71(72),1-2.3-4ab.7-8 (R. cf. 11)',
+  '1Jo 4, 7-10':   'Sl 71(72),1-2.3-4ab.7-8 (R. cf. 11)',
+  '1Jo 4,11-18':   'Sl 71(72),1-2.10-11.12-13 (R. cf. 11)',
+  '1Jo 4, 11-18':  'Sl 71(72),1-2.10-11.12-13 (R. cf. 11)',
+  '1Jo 4,19-5,4':  'Sl 71(72),1-2.14 e 15bc.17 (R. cf. 11)',
+  '1Jo 4, 19-5, 4': 'Sl 71(72),1-2.14 e 15bc.17 (R. cf. 11)',
+  '1Jo 5,1-5':     'Sl 36(37),3-4.5-6.30-31 (R. 39a)',
+  '1Jo 5, 1-5':    'Sl 36(37),3-4.5-6.30-31 (R. 39a)',
+  '1Jo 5,5-13':    'Sl 147,12-13.14-15.19-20 (R. 12a)',
+  '1Jo 5, 5-13':   'Sl 147,12-13.14-15.19-20 (R. 12a)',
+  '1Jo 5,14-21':   'Sl 149,1b-2.3-4.5-6a e 9b (R. 4a)',
+  '1Jo 5, 14-21':  'Sl 149,1b-2.3-4.5-6a e 9b (R. 4a)',
   // ── TEMPO COMUM — ANO C (semanas 9 a 34) ──────────────────────────────────
   // Semana 9
   'Dt 11,18.26-28.32': 'Sl 30(31),2-3a.3b-4.17 e 25 (R. 3a)',
@@ -1082,6 +1130,36 @@ function completarRefSalmo(refAPI, refLeitura) {
     if (v && SALMOS_REF[v]) return SALMOS_REF[v];
   }
   return refAPI || '';
+}
+
+// Busca referência completa do salmo via IA quando o banco não encontra
+async function buscarRefSalmoIA(refSalmoIncompleta, refLeitura, data) {
+  const chave = `salmoref_${refSalmoIncompleta}_${refLeitura}`;
+  const cached = localStorage.getItem(chave);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: `Na liturgia católica do dia ${data}, a primeira leitura é ${refLeitura} e o salmo responsorial é ${refSalmoIncompleta}. Qual é a referência COMPLETA do salmo (capítulo e versículos), no formato litúrgico brasileiro? Responda APENAS com a referência completa, sem explicações. Exemplo: Sl 97(98),1.2-3ab.3cd-4 (R. 2b)`
+        }]
+      })
+    });
+    const json = await response.json();
+    const ref = json.content?.[0]?.text?.trim();
+    if (ref && ref.includes(',')) {
+      localStorage.setItem(chave, ref);
+      return ref;
+    }
+  } catch(e) {}
+
+  return refSalmoIncompleta;
 }
 
 // ─── GAMEFICAÇÃO ─────────────────────────────────────────────────────────────
