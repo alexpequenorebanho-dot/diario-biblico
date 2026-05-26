@@ -61,7 +61,7 @@ body { background: var(--br); font-family: 'Lato', sans-serif; color: var(--tx);
 .leitura-label::after { content: ''; flex: 1; height: 1px; background: #e8eed8; }
 .leitura-ref { font-size: 12px; color: var(--vm); font-weight: 700; margin-bottom: 7px; }
 .leitura-intro { font-size: 12px; color: var(--tm); margin-bottom: 8px; font-style: italic; }
-.leitura-texto { font-size: 14px; line-height: 1.9; color: var(--tx); font-family: 'Lato', sans-serif; font-style: normal; }
+.leitura-texto { font-size: 14px; line-height: 1.9; color: var(--tx); font-family: 'Lato', sans-serif; font-style: normal; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; }
 .salmo-resp { background: var(--vp); border-left: 3px solid var(--vl); padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 6px 0 10px; font-size: 13px; font-style: italic; color: var(--ve); font-family: 'Playfair Display', serif; font-weight: 600; }
 
 /* ETAPAS */
@@ -305,7 +305,7 @@ function chaveHoje() {
 }
 function chaveLiturgiaHoje() {
   const d = new Date();
-  return `liturgia_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+  return `liturgia2_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
 }
 
 // Limpa caches de liturgia de dias anteriores automaticamente
@@ -439,7 +439,7 @@ function normalizarLiturgia(json) {
         const obj = {
           referencia: l.referencia || l.reference || l.ref || '',
           titulo: l.titulo || l.title || '',
-          texto: l.texto || l.text || l.content || ''
+          texto: l.texto || l.text || l.content || l.versos || l.versiculos || l.verses || ''
         };
         if (tipo.includes('primeira') || tipo.includes('first') || tipo === '1') {
           normalizado.primeiraLeitura = obj;
