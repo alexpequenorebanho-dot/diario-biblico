@@ -444,7 +444,7 @@ function normalizarLiturgia(json) {
         if (tipo.includes('primeira') || tipo.includes('first') || tipo === '1') {
           normalizado.primeiraLeitura = obj;
         } else if (tipo.includes('salmo') || tipo.includes('psalm')) {
-          normalizado.salmo = { ...obj, resposta: l.resposta || l.response || '' };
+          normalizado.salmo = { ...obj, refrao: l.refrao || l.refrão || l.resposta || l.response || l.antifona || l.antífona || '', resposta: l.resposta || l.response || '' };
         } else if (tipo.includes('segunda') || tipo.includes('second') || tipo === '2') {
           normalizado.segundaLeitura = obj;
         } else if (tipo.includes('evangelho') || tipo.includes('gospel')) {
@@ -532,8 +532,8 @@ function renderLiturgia() {
         <div class="leitura-section">
           <div class="leitura-label">Salmo Responsorial</div>
           <div class="leitura-ref">${completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia)}</div>
-          <div class="salmo-resp">R. ${lit.salmo.refrao}</div>
-          <div class="leitura-texto">${lit.salmo.texto.replace(/\n/g,'<br>')}</div>
+          <div class="salmo-resp">R. ${lit.salmo.refrao || lit.salmo.resposta || ''}</div>
+          <div class="leitura-texto">${(lit.salmo.texto || '').replace(/\n/g,'<br>')}</div>
         </div>
 
         ${temSegunda ? `<div class="leitura-section">
