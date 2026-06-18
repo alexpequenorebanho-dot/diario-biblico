@@ -509,7 +509,7 @@ function renderLiturgia() {
       <div class="liturgia-header">
         <div>
           <h2>${lit.liturgia || 'Liturgia do Dia'}</h2>
-          <div class="sub">${lit.data || hoje()} · ${lit.dia ? 'Tempo Pascal' : ''}</div>
+          <div class="sub">${lit.data || hoje()}</div>
         </div>
         <div class="cor-liturgica">
           <div class="cor-dot" style="background:${corDot(lit.cor)}"></div>
@@ -517,9 +517,6 @@ function renderLiturgia() {
         </div>
       </div>
       <div class="liturgia-body">
-        <div class="tempo-info">
-          <span class="badge badge-tempo">Tempo Pascal</span>
-        </div>
 
         <div class="leitura-section">
           <div class="leitura-label">Primeira Leitura</div>
@@ -533,7 +530,7 @@ function renderLiturgia() {
           <div class="leitura-label">Salmo Responsorial</div>
           <div class="leitura-ref" id="salmo-ref-display">${completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia)}</div>
           <div class="salmo-resp">R. ${lit.salmo.refrao || lit.salmo.resposta || ''}</div>
-          <div class="leitura-texto" style="white-space:pre-wrap">${(lit.salmo.texto || '').replace(/\\n/g,'\n')}</div>
+          <div class="leitura-texto">${(lit.salmo.texto || '').replace(/\n/g,'<br>')}</div>
         </div>
 
         ${temSegunda ? `<div class="leitura-section">
@@ -556,12 +553,13 @@ function renderLiturgia() {
       </div>
     </div>`;
 
-  // Se a referência do salmo está incompleta, busca via IA em background
-  if (lit.salmo && lit.primeiraLeitura && !completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia).includes(',')) {
+  // Sempre busca referência completa do salmo via IA em background
+  if (lit.salmo && lit.primeiraLeitura) {
+    const refAtual = completarRefSalmo(lit.salmo.referencia, lit.primeiraLeitura.referencia);
     buscarRefSalmoIA(lit.salmo.referencia, lit.primeiraLeitura.referencia, lit.data || hoje())
       .then(refCompleta => {
         const el = document.getElementById('salmo-ref-display');
-        if (el && refCompleta && refCompleta !== lit.salmo.referencia) {
+        if (el && refCompleta && refCompleta.includes(',')) {
           el.textContent = refCompleta;
         }
       });
@@ -1134,20 +1132,23 @@ function completarRefSalmo(refAPI, refLeitura) {
 
 // Busca referência completa do salmo via IA quando o banco não encontra
 async function buscarRefSalmoIA(refSalmoIncompleta, refLeitura, data) {
-  const chave = `salmoref_${refSalmoIncompleta}_${refLeitura}`;
+  const chave = `salmoref2_${refSalmoIncompleta}_${refLeitura}`;
   const cached = localStorage.getItem(chave);
   if (cached) return cached;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 100,
         messages: [{
           role: 'user',
-          content: `Na liturgia católica do dia ${data}, a primeira leitura é ${refLeitura} e o salmo responsorial é ${refSalmoIncompleta}. Qual é a referência COMPLETA do salmo (capítulo e versículos), no formato litúrgico brasileiro? Responda APENAS com a referência completa, sem explicações. Exemplo: Sl 97(98),1.2-3ab.3cd-4 (R. 2b)`
+          content: `Na liturgia católica romana do dia ${data}, a primeira leitura é ${refLeitura} e o salmo responsorial é ${refSalmoIncompleta}. Qual é a referência COMPLETA do salmo com versículos, no formato litúrgico brasileiro? Responda APENAS com a referência, sem mais nada. Exemplo de formato: Sl 97(98),1.2-3ab.3cd-4 (R. 2a)`
         }]
       })
     });
