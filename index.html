@@ -1109,28 +1109,29 @@ const SALMOS_REF = {
 function normalizarRef(ref) {
   if (!ref) return '';
   return ref
-    .replace(/, /g, ',')
-    .replace(/ ,/g, ',')
+    .replace(/,\s+/g, ',')
+    .replace(/;\s+/g, ';')
+    .replace(/\s+,/g, ',')
+    .replace(/\s+;/g, ';')
     .replace(/–/g, '-')
-    .replace(/ - /g, '-')
-    .replace(/ [.] /g, '.')
+    .replace(/\s+-\s+/g, '-')
     .trim();
 }
 
 function completarRefSalmo(refAPI, refLeitura) {
   if (refAPI && refAPI.includes(',')) return refAPI;
   const r = refLeitura || '';
-  const variantes = [
-    r,
-    normalizarRef(r),
-    r.replace(/, /g, ','),
-    r.replace(/,/g, ', '),
-    r.replace(/; /g, ';'),
-    r.replace(/;/g, '; '),
-  ];
-  for (const v of variantes) {
-    if (v && SALMOS_REF[v]) return SALMOS_REF[v];
+  const rNorm = normalizarRef(r);
+  
+  // Tenta direto e normalizado no SALMOS_REF
+  if (SALMOS_REF[r]) return SALMOS_REF[r];
+  if (SALMOS_REF[rNorm]) return SALMOS_REF[rNorm];
+  
+  // Tenta todas as chaves do banco normalizando ambos os lados
+  for (const k of Object.keys(SALMOS_REF)) {
+    if (normalizarRef(k) === rNorm) return SALMOS_REF[k];
   }
+  
   return refAPI || '';
 }
 
@@ -1250,7 +1251,7 @@ async function buscarRefSalmoIA(refSalmoIncompleta, refLeitura, data) {
   };
 
   // Normaliza a referência para buscar no banco
-  const norm = (r) => (r||'').replace(/\s+/g,' ').replace(/,\s+/g,',').replace(/;\s+/g,';').trim();
+  const norm = (r) => (r||'').replace(/,\s+/g,',').replace(/;\s+/g,';').replace(/\s+,/g,',').replace(/\s+;/g,';').replace(/–/g,'-').trim();
   const refNorm = norm(refLeitura);
   if (banco[refNorm]) {
     localStorage.setItem(chave, banco[refNorm]);
@@ -1451,6 +1452,13 @@ async function recarregarLiturgia() {
 // ─── INICIALIZAÇÃO ────────────────────────────────────────────────────────────
 async function iniciar() {
   limparCacheAntigo();
+  // Limpa cache de referências do salmo para forçar nova busca
+  const keysRef = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('salmoref') )) keysRef.push(k);
+  }
+  keysRef.forEach(k => localStorage.removeItem(k));
   carregarEstado();
   renderLiturgia();
   liturgia = await buscarLiturgia();
