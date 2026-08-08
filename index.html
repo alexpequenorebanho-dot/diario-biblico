@@ -309,7 +309,7 @@ function chaveHoje() {
 }
 function chaveLiturgiaHoje() {
   const d = new Date();
-  return `liturgia2_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+  return `liturgia3_${d.getFullYear()}_${d.getMonth()+1}_${d.getDate()}`;
 }
 
 // Limpa caches de liturgia de dias anteriores automaticamente
@@ -318,11 +318,18 @@ function limparCacheAntigo() {
   const keysParaRemover = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key && (key.startsWith('liturgia_') || key.startsWith('liturgia2_')) && key !== chaveHojeStr) {
+    if (key && (key.startsWith('liturgia_') || key.startsWith('liturgia2_') || key.startsWith('liturgia3_')) && key !== chaveHojeStr) {
       keysParaRemover.push(key);
     }
   }
   keysParaRemover.forEach(k => localStorage.removeItem(k));
+  // Limpa também caches de referência do salmo (para forçar nova busca)
+  const keysRef = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('salmoref')) keysRef.push(k);
+  }
+  keysRef.forEach(k => localStorage.removeItem(k));
 }
 function corDot(cor) {
   const m = {branco:'#e8e8e8',verde:'#4CAF50',vermelho:'#e53935',roxo:'#7B1FA2',rosa:'#EC407A',preto:'#212121'};
@@ -361,53 +368,85 @@ function carregarEstado() {
 }
 
 // ─── BUSCA DE LITURGIA ────────────────────────────────────────────────────────
+
+// Valida se o JSON da liturgia tem os dados essenciais corretos para a data de hoje
+function validarLiturgia(json) {
+  if (!json) return false;
+  if (!json.primeiraLeitura || !json.primeiraLeitura.texto) return false;
+  if (!json.salmo || !json.salmo.texto) return false;
+  if (!json.evangelho || !json.evangelho.texto) return false;
+  // Verifica se a data bate com hoje (quando disponível)
+  if (json.data) {
+    const partes = json.data.split('/');
+    if (partes.length === 3) {
+      const d = new Date();
+      const diaAPI = parseInt(partes[0]);
+      const mesAPI = parseInt(partes[1]);
+      const anoAPI = parseInt(partes[2]);
+      if (diaAPI !== d.getDate() || mesAPI !== (d.getMonth()+1) || anoAPI !== d.getFullYear()) {
+        return false; // Data errada — não usar
+      }
+    }
+  }
+  return true;
+}
+
 async function buscarLiturgia() {
-  // Tenta cache do dia primeiro
+  // Verifica cache — mas só usa se for do dia de hoje com dados completos
   const cached = localStorage.getItem(chaveLiturgiaHoje());
   if (cached) {
-    try { return JSON.parse(cached); } catch(e) {}
+    try {
+      const c = JSON.parse(cached);
+      if (validarLiturgia(c)) return c;
+      // Cache inválido — remove e busca de novo
+      localStorage.removeItem(chaveLiturgiaHoje());
+    } catch(e) {
+      localStorage.removeItem(chaveLiturgiaHoje());
+    }
   }
 
-  // Fonte 1: API principal Railway
+  const d = new Date();
+  const dia = d.getDate();
+  const mes = d.getMonth() + 1;
+  const ano = d.getFullYear();
+  const diaP = String(dia).padStart(2,'0');
+  const mesP = String(mes).padStart(2,'0');
+
+  // ── FONTE 1: API Railway (principal) ────────────────────────────────────────
   try {
     const r = await fetch('https://liturgia.up.railway.app/', {
       signal: AbortSignal.timeout(10000)
     });
-    if (!r.ok) throw new Error('falhou');
-    const json = await r.json();
-    if (json && json.primeiraLeitura) {
-      localStorage.setItem(chaveLiturgiaHoje(), JSON.stringify(json));
-      return json;
+    if (r.ok) {
+      const json = await r.json();
+      if (validarLiturgia(json)) {
+        localStorage.setItem(chaveLiturgiaHoje(), JSON.stringify(json));
+        return json;
+      }
     }
   } catch(e) {}
 
-  // Fonte 2: URL com data da mesma API
+  // ── FONTE 2: API Railway com data explícita ──────────────────────────────────
   try {
-    const d = new Date();
-    const url = `https://liturgia.up.railway.app/${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
+    const url = `https://liturgia.up.railway.app/${dia}-${mes}-${ano}`;
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!r.ok) throw new Error('falhou');
-    const json = await r.json();
-    if (json && json.primeiraLeitura) {
-      localStorage.setItem(chaveLiturgiaHoje(), JSON.stringify(json));
-      return json;
+    if (r.ok) {
+      const json = await r.json();
+      if (validarLiturgia(json)) {
+        localStorage.setItem(chaveLiturgiaHoje(), JSON.stringify(json));
+        return json;
+      }
     }
   } catch(e) {}
 
-  // Fonte 3: API alternativa (fabioluciano/liturgia-diaria no Render)
+  // ── FONTE 3: API Render ──────────────────────────────────────────────────────
   try {
-    const d = new Date();
-    const dia = String(d.getDate()).padStart(2,'0');
-    const mes = String(d.getMonth()+1).padStart(2,'0');
-    const ano = d.getFullYear();
-    const url = `https://liturgia-diaria.onrender.com/${ano}-${mes}-${dia}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!r.ok) throw new Error('falhou');
-    const json = await r.json();
-    // Normaliza o formato para o padrão esperado pelo app
-    if (json && (json.primeiraLeitura || json.primeira_leitura || json.leituras)) {
+    const url = `https://liturgia-diaria.onrender.com/${ano}-${mesP}-${diaP}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (r.ok) {
+      const json = await r.json();
       const normalizado = normalizarLiturgia(json);
-      if (normalizado) {
+      if (normalizado && validarLiturgia(normalizado)) {
         localStorage.setItem(chaveLiturgiaHoje(), JSON.stringify(normalizado));
         return normalizado;
       }
@@ -807,8 +846,21 @@ function copiarHistorico(chave) {
 // Banco completo de referências dos salmos por leitura
 // Cobre todo o Tempo Pascal (semanas 2 a 7)
 const SALMOS_REF = {
-  // 4ª Semana da Páscoa
-  'At 11, 1-18':   'Sl 41(42),2-3; 42(43),3.4 (R. cf. 41,3)',
+  // ── MEMÓRIAS DE SANTOS — Agosto ─────────────────────────────────────────────
+  'Hab 1,12-2,4':    'Sl 9A(9),8-9.10-11.12-13 (R. 11b)',    // São Domingos (08/08)
+  'Hab 1, 12-2, 4':  'Sl 9A(9),8-9.10-11.12-13 (R. 11b)',
+  'Ez 9,1-7;10,18-22': 'Sl 112(113),1-2.3-4.5-6 (R. cf. Ap 15,4a)', // São Lourenço (10/08)
+  'Ez 9, 1-7; 10, 18-22': 'Sl 112(113),1-2.3-4.5-6 (R. cf. Ap 15,4a)',
+  '2Cor 9,6-10':     'Sl 111(112),1-2.5-6.7-8.9 (R. Sl 111,1b)',  // São Lourenço (10/08)
+  '2Cor 9, 6-10':    'Sl 111(112),1-2.5-6.7-8.9 (R. Sl 111,1b)',
+  'Ap 11,19a;12,1-6a.10ab': 'Sl 44(45),10.11-12.16 (R. 10bc)', // Assunção (15/08)
+  '1Cr 15,3-4.15-16;16,1-2': 'Sl 131(132),6-7.9-10.13-14 (R. 8)', // Assunção (15/08)
+  'Nm 6,22-27':      'Sl 66(67),2-3.5.6 e 8 (R. 2a)',         // Maria (01/01)
+  'Sf 3,14-18a':     'Is 12,2-3.4bcd.5-6 (R. 6)',             // Advento
+  // ── MEMÓRIAS DE SANTOS — Julho/Agosto ────────────────────────────────────
+  'Jr 26,11-16.24':  'Sl 68(69),15-16.30-31.33-34 (R. cf. 34)',
+  'Jr 26, 11-16.24': 'Sl 68(69),15-16.30-31.33-34 (R. cf. 34)',
+  'Jr 26, 11-16. 24':'Sl 68(69),15-16.30-31.33-34 (R. cf. 34)',
   'At 11,19-26':   'Sl 86(87),1b-3.4-5.6-7 (R. cf. Jo 10,16)',
   'At 12,24-13,5': 'Sl 66(67),2-3.5.6 e 8 (R. 4)',
   'At 13, 13-25':  'Sl 88(89),2-3.21-22.25 e 27 (R. cf. 2a)',
@@ -1110,8 +1162,8 @@ function normalizarRef(ref) {
   if (!ref) return '';
   return ref
     .replace(/,\s+/g, ',')
-    .replace(/;\s+/g, ';')
     .replace(/\s+,/g, ',')
+    .replace(/;\s+/g, ';')
     .replace(/\s+;/g, ';')
     .replace(/–/g, '-')
     .replace(/\s+-\s+/g, '-')
@@ -1123,11 +1175,8 @@ function completarRefSalmo(refAPI, refLeitura) {
   const r = refLeitura || '';
   const rNorm = normalizarRef(r);
   
-  // Tenta direto e normalizado no SALMOS_REF
   if (SALMOS_REF[r]) return SALMOS_REF[r];
   if (SALMOS_REF[rNorm]) return SALMOS_REF[rNorm];
-  
-  // Tenta todas as chaves do banco normalizando ambos os lados
   for (const k of Object.keys(SALMOS_REF)) {
     if (normalizarRef(k) === rNorm) return SALMOS_REF[k];
   }
@@ -1251,7 +1300,7 @@ async function buscarRefSalmoIA(refSalmoIncompleta, refLeitura, data) {
   };
 
   // Normaliza a referência para buscar no banco
-  const norm = (r) => (r||'').replace(/,\s+/g,',').replace(/;\s+/g,';').replace(/\s+,/g,',').replace(/\s+;/g,';').replace(/–/g,'-').trim();
+  const norm = (r) => (r||'').replace(/\s+/g,' ').replace(/,\s+/g,',').replace(/;\s+/g,';').trim();
   const refNorm = norm(refLeitura);
   if (banco[refNorm]) {
     localStorage.setItem(chave, banco[refNorm]);
@@ -1452,13 +1501,6 @@ async function recarregarLiturgia() {
 // ─── INICIALIZAÇÃO ────────────────────────────────────────────────────────────
 async function iniciar() {
   limparCacheAntigo();
-  // Limpa cache de referências do salmo para forçar nova busca
-  const keysRef = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && (k.startsWith('salmoref') )) keysRef.push(k);
-  }
-  keysRef.forEach(k => localStorage.removeItem(k));
   carregarEstado();
   renderLiturgia();
   liturgia = await buscarLiturgia();
